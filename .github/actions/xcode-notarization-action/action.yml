@@ -1,41 +1,48 @@
-# Modified from cocoalibs/xcode-notarization-action@1.0.3
 name: 'Xcode Codesign, Notarize, and Staple Action'
-description: 'Given an .app, performs codesigning, notarization, and stapling to produce a .zip and .dmg'
+description: 'Given an .app, performs optional codesigning, notarization, and stapling to produce a .zip and .dmg'
 branding:
   icon: 'award'
   color: 'green'
 
 inputs:
   build-name:
-    description: 'Path of the software to notarize. Globbing is supported'
-    requires: true
+    description: 'Path of the software to package. Globbing is supported'
+    required: true
+
   staple:
     description: 'Whether to run `stapler staple`'
-    requires: true
+    required: false
     default: 'true'
+
   keychain-profile:
     description: 'notarytool --keychain-profile parameter'
-    required: true
+    required: false
     default: 'notary'
+
   apple-id:
     description: 'notarytool --apple-id parameter'
-    required: true
+    required: false
+
   password:
     description: 'notarytool --password parameter'
-    required: true
+    required: false
+
   team-id:
     description: 'notarytool --team-id parameter'
-    required: true
+    required: false
+
   xcode-path:
     description: 'Path of the Xcode version to use'
     required: true
-    default: '/Applications/Xcode_13.2.1.app' # available on both macos-11 and macos-12 environments
+    default: '/Applications/Xcode_13.2.1.app'
+
   p12-file-base64:
     description: 'The certificates in a PKCS12 file encoded as a base64 string.'
-    required: true
+    required: false
+
   p12-password:
     description: 'The password used to import the PKCS12 file.'
-    required: true
+    required: false
 
 runs:
   using: 'composite'
@@ -43,35 +50,45 @@ runs:
     - name: Setup Xcode
       run: sudo xcode-select -s ${{ inputs.xcode-path }}
       shell: bash
+
     - name: Prepare Notarization Credentials
+      if: ${{ inputs.apple-id != '' && inputs.password != '' && inputs.team-id != '' }}
       id: create-keychain
       run: |
-        # create temporary keychain
         KEYCHAIN_PATH=$RUNNER_TEMP/notarization.keychain
         KEYCHAIN_PASS=$(uuidgen)
         echo "keychain-path-output=$(echo $RUNNER_TEMP)/notarization" >> $GITHUB_OUTPUT
         security create-keychain -p "${KEYCHAIN_PASS}" ${KEYCHAIN_PATH}
         security set-keychain-settings -lut 900 ${KEYCHAIN_PATH}
         security unlock-keychain -p "${KEYCHAIN_PASS}" ${KEYCHAIN_PATH}
-        # import credentials from secrets
-        xcrun notarytool store-credentials "${{ inputs.keychain-profile }}" --apple-id "${{ inputs.apple-id }}" --password "${{ inputs.password }}" --team-id "${{ inputs.team-id }}" --keychain "${KEYCHAIN_PATH}"
+        xcrun notarytool store-credentials "${{ inputs.keychain-profile }}" \
+          --apple-id "${{ inputs.apple-id }}" \
+          --password "${{ inputs.password }}" \
+          --team-id "${{ inputs.team-id }}" \
+          --keychain "${KEYCHAIN_PATH}"
       shell: bash
+
     - name: Import codesigning certificates
+      if: ${{ inputs.p12-file-base64 != '' && inputs.p12-password != '' }}
       uses: apple-actions/import-codesign-certs@v3
-      with: 
+      with:
         keychain: ${{ steps.create-keychain.outputs.keychain-path-output }}
         create-keychain: false
         p12-file-base64: ${{ inputs.p12-file-base64 }}
         p12-password: ${{ inputs.p12-password }}
+
     - name: Codesign ${{ inputs.build-name }}.app
+      if: ${{ inputs.team-id != '' }}
       run: |
+        KEYCHAIN_PATH=$RUNNER_TEMP/notarization.keychain
         codesign -f -s "${{ inputs.team-id }}" -o runtime --keychain "${KEYCHAIN_PATH}" './bin/${{ inputs.build-name }}.app'
       shell: bash
-    - name: Create and codesign ${{ inputs.build-name }}.dmg
+
+    - name: Create ${{ inputs.build-name }}.dmg
       run: |
         brew install create-dmg
         mkdir ./bin/dmg-workspace
-        ditto './bin/${{ inputs.build-name }}.app' './bin/dmg-workspace/${{ inputs.build-name }}.app' 
+        ditto './bin/${{ inputs.build-name }}.app' './bin/dmg-workspace/${{ inputs.build-name }}.app'
         create-dmg \
           --volname "Install ${{ inputs.build-name }}" \
           --window-pos 200 120 \
@@ -80,25 +97,36 @@ runs:
           --icon "${{ inputs.build-name }}.app" 200 190 \
           --hide-extension "${{ inputs.build-name }}.app" \
           --app-drop-link 600 185 \
-          --codesign "${{ inputs.team-id }}" \
           "./bin/${{ inputs.build-name }}.dmg" \
           "./bin/dmg-workspace"
       shell: bash
+
     - name: Notarize ${{ inputs.build-name }}.dmg
+      if: ${{ inputs.apple-id != '' && inputs.password != '' && inputs.team-id != '' }}
       run: |
         KEYCHAIN_PATH=$RUNNER_TEMP/notarization.keychain
-        xcrun notarytool submit './bin/${{ inputs.build-name }}.dmg' --keychain-profile "${{ inputs.keychain-profile }}" --keychain "${KEYCHAIN_PATH}" --wait
+        xcrun notarytool submit './bin/${{ inputs.build-name }}.dmg' \
+          --keychain-profile "${{ inputs.keychain-profile }}" \
+          --keychain "${KEYCHAIN_PATH}" --wait
       shell: bash
+
     - name: Staple ${{ inputs.build-name }}.dmg
-      if: ${{ inputs.staple == 'true' }}
+      if: ${{ inputs.staple == 'true' && inputs.apple-id != '' }}
       run: xcrun stapler staple './bin/${{ inputs.build-name }}.dmg'
       shell: bash
+
     - name: Staple .app and create ${{ inputs.build-name }}.app.zip
-      if: ${{ inputs.staple == 'true' }}
+      if: ${{ inputs.staple == 'true' && inputs.apple-id != '' }}
       run: |
         xcrun stapler staple './bin/${{ inputs.build-name }}.app'
         ditto -c -k --keepParent './bin/${{inputs.build-name}}.app' './bin/${{inputs.build-name}}.app.zip'
       shell: bash
+
+    - name: Create unsigned ${{ inputs.build-name }}.app.zip (fallback)
+      if: ${{ inputs.apple-id == '' }}
+      run: ditto -c -k --keepParent './bin/${{inputs.build-name}}.app' './bin/${{inputs.build-name}}.app.zip'
+      shell: bash
+
     - name: Cleanup
       if: ${{ always() }}
       run: security delete-keychain $RUNNER_TEMP/notarization.keychain
