@@ -41,3 +41,4 @@ You need to have `Go`, `NPM`, and `Task` installed and available on your machine
 
 ## Thanks for
 * [grpcmd-gui](https://github.com/grpcmd/grpcmd-gui)
+* [grpcurl](https://github.com/fullstorydev/grpcurl)
