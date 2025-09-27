@@ -4,13 +4,15 @@ import { getErrorMessage, grpcStatusCodeToString } from '@/lib/utils'
 import { useWindowStore } from '@/window-store'
 import Editor, { useMonaco } from '@monaco-editor/react'
 import { WML } from '@wailsio/runtime'
-import { Bug, Lightbulb, NotepadTextDashed } from 'lucide-react'
+import { Copy, NotepadTextDashed, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type {
   ImperativePanelHandle,
   PanelOnResize,
 } from 'react-resizable-panels'
 import { GrpcmdService } from '../../bindings/github.com/grpcmd/grpcmd-gui'
+import FormatButton from './format-button'
+import MetadataPopup from './metadata-popup'
 import SelectMethod from './select-method'
 import {
   ResizableHandle,
@@ -40,16 +42,21 @@ export default function HttpClient() {
   const theme = useWindowStore.use.theme()
   const setTheme = useWindowStore.use.setTheme()
   const updateActiveRequest = useWindowStore.use.updateActiveRequest()
+ 
 
   const [loading, setLoading] = useState(false)
 
-  const { address, method, methodSource, request, response } =
+  const { address, method, methodSource,metadata, request, response } =
     requests[activeRequestId]
   const setAddress = (address: string) => updateActiveRequest({ address })
   const setRequest = (request: string) => updateActiveRequest({ request })
   const setResponse = (response: string) => updateActiveRequest({ response })
 
+  const setMetadata = (metadata: string) => updateActiveRequest({ metadata })
+
   const monaco = useMonaco()
+
+  const editorRef = useRef<any>(null)
 
   // Provide inlay hints for gRPC status codes in the response.
   useEffect(() => {
@@ -122,6 +129,7 @@ export default function HttpClient() {
       const res = await GrpcmdService.CallWithResult(
         address,
         method,
+        metadata,
         request,
         protoPaths,
         protoFilesArg,
@@ -143,6 +151,20 @@ export default function HttpClient() {
       setResponse(getErrorMessage(error))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const copyJsonResponse = async () => {
+    try {
+      // 匹配第一个 { ... } JSON 块
+      const match = response.match(/{[\s\S]*?}/)
+      if (match) {
+        await navigator.clipboard.writeText(match[0])
+      } else {
+        await navigator.clipboard.writeText('') // 没有就清空
+      }
+    } catch (err) {
+      console.error('Failed to copy:', err)
     }
   }
 
@@ -174,7 +196,7 @@ export default function HttpClient() {
       >
         <div className="grid grid-cols-1 grid-rows-[min-content_min-content_min-content_minmax(0,_1fr)_min-content] p-4 space-y-4 h-full">
           <h2 className="text-xl font-bold text-right">Request</h2>
-          <div className="flex-1">
+          {/* <div className="flex-1">
             <Input
               id="input-address"
               type="text"
@@ -183,32 +205,56 @@ export default function HttpClient() {
               onChange={(e) => setAddress(e.target.value)}
               spellCheck="false"
             />
+          </div > */}
+          <div className="grid grid-cols-[minmax(0,_3fr)_min-content] space-x-2 overflow-hidden">
+            {/* 地址输入框 */}
+            <Input
+              id="input-address"
+              type="text"
+              placeholder="Enter Address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              spellCheck="false"
+            />
+            <MetadataPopup
+              metadata={metadata}
+              setMetadata={setMetadata}
+              theme={theme}
+            />
           </div>
-
-          <div className="grid grid-cols-[minmax(0,_1fr)_min-content] space-x-2 overflow-hidden">
+          <div className="grid grid-cols-[minmax(0,_3fr)_min-content] space-x-2 overflow-hidden">
             <SelectMethod />
             <Button id="send-request" onClick={sendRequest} disabled={loading}>
               Send Request
             </Button>
-          </div>
+          </div>  
 
           <Editor
+            onMount={(editor) => (editorRef.current = editor)}
             height="100%"
-            language="json"
+            language="jsonc"
             value={request}
             onChange={(v) => setRequest(v ?? '')}
             options={{
-              minimap: {
-                enabled: false,
-              },
+              minimap: { enabled: false },
               wordWrap: 'on',
-              scrollBeyondLastLine: false, // removes unnecesary scrollbar
+              scrollBeyondLastLine: false,
               theme: theme === 'light' ? 'vs' : 'vs-dark',
               tabSize: 2,
+              folding: true,                 // ✅ 开启折叠功能
+              showFoldingControls: 'always', // ✅ 总是显示折叠箭头
+              automaticLayout: true,         // ✅ 容器尺寸变化时自动调整
+              lineNumbers: 'on',             // 可显示行号
+              renderLineHighlight: 'all',    // 高亮当前行
             }}
-            className="input-request mb-4"
           />
-          <div>
+
+          
+          <div className="flex space-x-2">
+            <FormatButton
+              request={request}
+              setRequest={setRequest}
+            />
             <Button
               id="generate-request-template"
               variant="outline"
@@ -220,7 +266,7 @@ export default function HttpClient() {
                 strokeWidth={2}
                 aria-hidden="true"
               />
-              Generate Request Template
+              Generate Template
             </Button>
           </div>
         </div>
@@ -232,38 +278,40 @@ export default function HttpClient() {
             <h2 className="text-xl font-bold mb-4">Response</h2>
             <div className="flex space-x-2">
               <TooltipProvider delayDuration={0}>
+                {/* 新增清空返回按钮 */}
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      id="suggest-feature"
-                      variant="outline"
-                      size="icon"
-                      aria-label="Suggest a feature"
-                      wml-openurl="https://grpcmd.featurebase.app"
-                    >
-                      <Lightbulb size={16} strokeWidth={2} aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="px-2 py-1 text-xs">
-                    Suggest a feature
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      id="report-bug"
-                      variant="outline"
-                      size="icon"
-                      aria-label="Report a bug"
-                      wml-openurl="https://github.com/grpcmd/grpcmd-gui/issues"
-                    >
-                      <Bug size={16} strokeWidth={2} aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="px-2 py-1 text-xs">
-                    Report a bug
-                  </TooltipContent>
-                </Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    id="copy-response-json"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Copy JSON response"
+                    onClick={copyJsonResponse}
+                  >
+                    <Copy size={16} strokeWidth={2} aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="px-2 py-1 text-xs">
+                  Copy JSON
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    id="clear-response"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Clear response"
+                    onClick={() => setResponse('')}
+                  >
+                    <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="px-2 py-1 text-xs">
+                  Clear response
+                </TooltipContent>
+              </Tooltip>
               </TooltipProvider>
               <Select value={theme} onValueChange={(v) => setTheme(v)}>
                 <SelectTrigger id="input-theme" className="w-[90px]">
@@ -282,7 +330,7 @@ export default function HttpClient() {
           <Editor
             className="output-response"
             height="100%"
-            language="json"
+            language="jsonc"
             value={response}
             options={{
               minimap: {
@@ -293,6 +341,11 @@ export default function HttpClient() {
               scrollBeyondLastLine: false, // removes unnecesary scrollbar
               theme: theme === 'light' ? 'vs' : 'vs-dark',
               tabSize: 2,
+              folding: true,                 // ✅ 折叠
+              showFoldingControls: 'always', // ✅ 总是显示折叠箭头
+              automaticLayout: true,
+              lineNumbers: 'on',
+              renderLineHighlight: 'all',    // ✅ 高亮当前行
             }}
           />
         </div>

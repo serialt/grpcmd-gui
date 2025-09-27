@@ -8,36 +8,32 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import {Call as $Call, Create as $Create} from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 /**
  * GetItem retrieves a value from the configuration by key
  */
-export function GetItem(key: string): Promise<string> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(4122952478, key) as any;
-    return $resultPromise;
+export function GetItem(key: string): $CancellablePromise<string> {
+    return $Call.ByID(4122952478, key);
 }
 
 /**
  * OnConfigChange registers a callback for configuration changes
  */
-export function OnConfigChange(callback: any): Promise<any> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3283491376, callback) as any;
-    return $resultPromise;
+export function OnConfigChange(callback: any): $CancellablePromise<any> {
+    return $Call.ByID(3283491376, callback);
 }
 
 /**
  * RemoveItem removes a value from the configuration
  */
-export function RemoveItem(key: string): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3426349016, key) as any;
-    return $resultPromise;
+export function RemoveItem(key: string): $CancellablePromise<void> {
+    return $Call.ByID(3426349016, key);
 }
 
 /**
  * SetItem sets a value in the configuration
  */
-export function SetItem(key: string, value: string): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(1377100810, key, value) as any;
-    return $resultPromise;
+export function SetItem(key: string, value: string): $CancellablePromise<void> {
+    return $Call.ByID(1377100810, key, value);
 }

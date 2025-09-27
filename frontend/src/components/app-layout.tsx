@@ -11,8 +11,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider
       style={{
         // @ts-ignore
-        '--sidebar-width': '14rem',
-        '--sidebar-width-mobile': '14rem',
+        '--sidebar-width': '11rem',
+        '--sidebar-width-mobile': '11rem',
       }}
     >
       <AppLayoutSidebar

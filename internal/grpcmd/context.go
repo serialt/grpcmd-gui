@@ -3,12 +3,14 @@ package grpcmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/ettle/strcase"
 	"github.com/fullstorydev/grpcurl"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/grpcreflect"
@@ -162,44 +164,45 @@ func (ctx *GrpcmdContext) NonambiguousMethods() ([]string, error) {
 		}
 	}
 
-	return nonambiguousMethods, nil
+	return methods, nil
 }
 
 func (ctx *GrpcmdContext) findFullyQualifiedMethod(method string) (string, error) {
-	methods, err := ctx.Methods()
-	if err != nil {
-		return "", err
-	}
-	matches := make([]string, 0, 1)
-	exactMatches := make([]string, 0, 1)
-	for _, fullyQualifiedName := range methods {
-		if i := strings.Index(fullyQualifiedName, method); i > -1 {
-			matches = append(matches, fullyQualifiedName)
-		}
-		i := strings.LastIndex(fullyQualifiedName, ".")
-		name := fullyQualifiedName[i+1:]
-		if method == name {
-			exactMatches = append(exactMatches, fullyQualifiedName)
-		}
-	}
-	if len(matches) == 0 {
-		return "", errors.New("No matching method for: " + method)
-	} else if len(matches) == 1 {
-		return matches[0], nil
-	} else if len(exactMatches) == 1 {
-		return exactMatches[0], nil
-	} else {
-		var text strings.Builder
-		text.WriteString("Ambiguous method ")
-		text.WriteString(method)
-		text.WriteString(". Matching methods:\n")
-		for _, m := range matches {
-			text.WriteString("\t\t")
-			text.WriteString(m)
-			text.WriteRune('\n')
-		}
-		return "", errors.New(text.String())
-	}
+	// methods, err := ctx.Methods()
+	// if err != nil {
+	// 	return "", err
+	// }
+	return method, nil
+	// matches := make([]string, 0, 1)
+	// exactMatches := make([]string, 0, 1)
+	// for _, fullyQualifiedName := range methods {
+	// 	if i := strings.Index(fullyQualifiedName, method); i > -1 {
+	// 		matches = append(matches, fullyQualifiedName)
+	// 	}
+	// 	i := strings.LastIndex(fullyQualifiedName, ".")
+	// 	name := fullyQualifiedName[i+1:]
+	// 	if method == name {
+	// 		exactMatches = append(exactMatches, fullyQualifiedName)
+	// 	}
+	// }
+	// if len(matches) == 0 {
+	// 	return "", errors.New("No matching method for: " + method)
+	// } else if len(matches) == 1 {
+	// 	return matches[0], nil
+	// } else if len(exactMatches) == 1 {
+	// 	return exactMatches[0], nil
+	// } else {
+	// 	var text strings.Builder
+	// 	text.WriteString("Ambiguous method ")
+	// 	text.WriteString(method)
+	// 	text.WriteString(". Matching methods:\n")
+	// 	for _, m := range matches {
+	// 		text.WriteString("\t\t")
+	// 		text.WriteString(m)
+	// 		text.WriteRune('\n')
+	// 	}
+	// 	return "", errors.New(text.String())
+	// }
 }
 
 func (ctx *GrpcmdContext) ServicesMethodsOutput() (string, error) {
@@ -353,6 +356,46 @@ func (ctx *GrpcmdContext) CallWithResult(method, data string, headers []string) 
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, formattedStatus)
 		return nil, GrpcStatusExitError{Code: 64 + int(h.Status.Code())}
+	}
+	result.Messages, _ = FormatMessagesToSnakeCase(result.Messages)
+	return result, nil
+}
+
+// convertKeysToSnakeCase 递归将 JSON 对象中的所有 key 转为 snake_case
+func convertKeysToSnakeCase(data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		newMap := make(map[string]interface{}, len(v))
+		for key, val := range v {
+			newMap[strcase.ToSnake(key)] = convertKeysToSnakeCase(val)
+		}
+		return newMap
+	case []interface{}:
+		for i := range v {
+			v[i] = convertKeysToSnakeCase(v[i])
+		}
+		return v
+	default:
+		return v
+	}
+}
+
+// FormatMessagesToSnakeCase 格式化 Messages 为 snake_case JSON
+func FormatMessagesToSnakeCase(messages []string) ([]string, error) {
+	result := make([]string, 0, len(messages))
+	for _, msg := range messages {
+		var obj interface{}
+		if err := json.Unmarshal([]byte(msg), &obj); err != nil {
+			// 如果不是 JSON，保持原样
+			result = append(result, msg)
+			continue
+		}
+		snakeObj := convertKeysToSnakeCase(obj)
+		snakeBytes, err := json.MarshalIndent(snakeObj, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, string(snakeBytes))
 	}
 	return result, nil
 }

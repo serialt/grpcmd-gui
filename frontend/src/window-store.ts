@@ -87,6 +87,7 @@ const storage: PersistStorage<Partial<WindowState>> = {
             title: 'New Request',
             address: '',
             method: '',
+            metadata: '',
             methodSource: '',
             request: '',
             response: '',
@@ -144,12 +145,14 @@ export type WindowState = {
   protoFiles: string[]
   hasSeenOnboarding: boolean
   hasSeenTour: boolean
+  customHeaders: { key: string; value: string }[]
   requests: {
     [key: string]: {
       id: string
       title: string
       address: string
       method: string
+      metadata: string
       methodSource: string
       request: string
       response: string
@@ -169,6 +172,7 @@ const getInitialState = (): WindowState => {
     deleteRequestAfterMs: 604800000, // 7 days in milliseconds
     protoPaths: [],
     protoFiles: [],
+    customHeaders: [],
     hasSeenOnboarding: false,
     hasSeenTour: true, // The end of the onboarding sets this to false to start to tour.
     requests: {
@@ -177,6 +181,7 @@ const getInitialState = (): WindowState => {
         title: 'New Request',
         address: '',
         method: '',
+        metadata: '',
         methodSource: '',
         request: '',
         response: '',
@@ -200,6 +205,7 @@ export const useWindowStore = createSelectors(
                   title: 'New Request',
                   address: '',
                   method: '',
+                  metadata: '',
                   methodSource: '',
                   request: '',
                   response: '',
@@ -316,6 +322,10 @@ export const useWindowStore = createSelectors(
             setHasSeenOnboarding: (seen: boolean) =>
               set((state) => {
                 state.hasSeenOnboarding = seen
+              }),
+            setCustomHeaders: (header: { key: string; value: string }[]) =>
+              set((state) => {
+                state.customHeaders = header
               }),
             setHasSeenTour: (seen: boolean) =>
               set((state) => {

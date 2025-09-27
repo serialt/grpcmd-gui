@@ -3,33 +3,26 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import {Call as $Call, Create as $Create} from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as grpcmd$0 from "./internal/grpcmd/models.js";
 
-export function CallWithResult(address: string, method: string, req: string, protoPaths: string[], protoFiles: string[]): Promise<grpcmd$0.Result> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(913647537, address, method, req, protoPaths, protoFiles) as any;
-    let $typingPromise = $resultPromise.then(($result: any) => {
+export function CallWithResult(address: string, method: string, metadata: string, req: string, protoPaths: string[], protoFiles: string[]): $CancellablePromise<grpcmd$0.Result> {
+    return $Call.ByID(913647537, address, method, metadata, req, protoPaths, protoFiles).then(($result: any) => {
         return $$createType0($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
+    });
 }
 
-export function MethodTemplate(address: string, method: string): Promise<string> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3477185463, address, method) as any;
-    return $resultPromise;
+export function MethodTemplate(address: string, method: string): $CancellablePromise<string> {
+    return $Call.ByID(3477185463, address, method);
 }
 
-export function NonambiguousMethods(address: string): Promise<string[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(2002104549, address) as any;
-    let $typingPromise = $resultPromise.then(($result: any) => {
+export function NonambiguousMethods(address: string): $CancellablePromise<string[]> {
+    return $Call.ByID(2002104549, address).then(($result: any) => {
         return $$createType1($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
+    });
 }
 
 // Private type creation functions

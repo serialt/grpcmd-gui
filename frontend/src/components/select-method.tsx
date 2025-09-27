@@ -53,7 +53,7 @@ export default function SelectMethod() {
       try {
         const response = await GrpcmdService.NonambiguousMethods(address)
         setOptions(
-          response.map((v) => ({
+          response.map((v: string) => ({
             value: v,
             label: v,
           })),
@@ -102,7 +102,7 @@ export default function SelectMethod() {
           )
           setProtoFileOptions({
             ...protoFileOptions,
-            [protoFile]: response.map((v) => ({
+            [protoFile]: response.map((v: string) => ({
               value: v,
               label: v,
             })),

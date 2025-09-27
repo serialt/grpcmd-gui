@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,13 +14,14 @@ import (
 
 type GrpcmdService struct{}
 
-func (g *GrpcmdService) CallWithResult(address string, method string, req string, protoPaths []string, protoFiles []string) grpcmd.Result {
-	headers, data, err := parseHeadersAndBodyFromFullRequest(req)
-	if err != nil {
-		return grpcmd.Result{
-			Messages: []string{err.Error()},
-		}
-	}
+func (g *GrpcmdService) CallWithResult(address string, method string, metadata string, req string, protoPaths []string, protoFiles []string) grpcmd.Result {
+	fmt.Printf("metadata: %v\n", metadata)
+	fmt.Printf("req: %v\n", req)
+	_, data, _ := parseHeadersAndBodyFromFullRequest(req)
+
+	_, header, _ := parseHeadersAndBodyFromFullRequest(metadata)
+	headers := parseMetadata(header)
+
 	ctx := grpcmd.NewContext()
 	defer ctx.Free()
 	if len(protoFiles) > 0 {
@@ -30,7 +32,7 @@ func (g *GrpcmdService) CallWithResult(address string, method string, req string
 			}
 		}
 	}
-	err = ctx.Connect(address)
+	err := ctx.Connect(address)
 	if err != nil {
 		return grpcmd.Result{
 			Messages: []string{err.Error()},
@@ -75,8 +77,11 @@ func (g *GrpcmdService) MethodTemplate(address, method string) string {
 	if i == -1 {
 		return "Unable to find method template."
 	}
-
-	return describeMethod[i+10:]
+	data, _ := grpcmd.FormatMessagesToSnakeCase([]string{describeMethod[i+10:]})
+	if len(data) == 1 {
+		return data[0]
+	}
+	return ""
 }
 
 func parseHeadersAndBodyFromFullRequest(req string) ([]string, string, error) {
@@ -112,4 +117,50 @@ func parseHeadersAndBodyFromFullRequest(req string) ([]string, string, error) {
 	}
 
 	return headers, string(data), nil
+}
+
+// func parseHeadersAndBodyFromFullRequest(req string) ([]string, string, error) {
+// 	reqTrimmed := strings.TrimSpace(req)
+// 	if len(reqTrimmed) == 0 {
+// 		return nil, "", nil
+// 	}
+
+// 	lines := strings.Split(reqTrimmed, "\n")
+// 	headers := []string{}
+// 	bodyLines := []string{}
+// 	foundBody := false
+
+// 	for _, line := range lines {
+// 		line = strings.TrimSpace(line)
+// 		if !foundBody {
+// 			if strings.HasPrefix(line, "{") {
+// 				// 从这里开始是 body
+// 				foundBody = true
+// 				bodyLines = append(bodyLines, line)
+// 				continue
+// 			}
+// 			// 非 { 开头的都当 header
+// 			if line != "" {
+// 				headers = append(headers, line)
+// 			}
+// 		} else {
+// 			bodyLines = append(bodyLines, line)
+// 		}
+// 	}
+
+// 	return headers, strings.Join(bodyLines, "\n"), nil
+// }
+
+func parseMetadata(header string) (metadata []string) {
+	reqTrimmed := strings.TrimSpace(header)
+	// 解析 JSON 到 map
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(reqTrimmed), &m); err != nil {
+		panic(err)
+	}
+
+	for k, v := range m {
+		metadata = append(metadata, fmt.Sprintf("%s:%v", k, v))
+	}
+	return
 }
