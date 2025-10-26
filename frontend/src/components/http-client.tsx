@@ -156,12 +156,11 @@ export default function HttpClient() {
 
   const copyJsonResponse = async () => {
     try {
-      // 匹配第一个 { ... } JSON 块
-      const match = response.match(/{[\s\S]*?}/)
+      const match = response.match(/{[\s\S]*}/)
       if (match) {
         await navigator.clipboard.writeText(match[0])
       } else {
-        await navigator.clipboard.writeText('') // 没有就清空
+        await navigator.clipboard.writeText('')
       }
     } catch (err) {
       console.error('Failed to copy:', err)
@@ -266,7 +265,7 @@ export default function HttpClient() {
                 strokeWidth={2}
                 aria-hidden="true"
               />
-              Generate Template
+              Gen message
             </Button>
           </div>
         </div>

@@ -75,7 +75,7 @@ func removeDuplicates[T comparable](slice []T) []T {
 
 func (ctx *GrpcmdContext) Connect(address string) error {
 	var cancel context.CancelFunc
-	ctx._ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	ctx._ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
 	ctx.deferCall(cancel)
 
 	var err error

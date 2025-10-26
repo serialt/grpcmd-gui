@@ -16,7 +16,7 @@ export default function FormatButton({ request, setRequest }: { request: string,
   return (
     <>
       <Button id="format-request-json" variant="outline" onClick={handleFormat}>
-        Format JSON
+        Prettify
       </Button>
 
       {/* 弹窗 */}

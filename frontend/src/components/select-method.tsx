@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Plus, RefreshCcw, Trash2 } from 'lucide-react'
 import { Fragment, useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -47,24 +47,28 @@ export default function SelectMethod() {
   const [protoFileOptions, setProtoFileOptions] = useState<{
     [protoFile: string]: Option[]
   }>({})
+  const [loading, setLoading] = useState(false)
+
+  const fetchMethods = async () => {
+    setLoading(true)
+    try {
+      const response = await GrpcmdService.NonambiguousMethods(address)
+      setOptions(
+        response.map((v: string) => ({
+          value: v,
+          label: v,
+        })),
+      )
+    } catch {
+      setOptions([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchMethods() {
-      try {
-        const response = await GrpcmdService.NonambiguousMethods(address)
-        setOptions(
-          response.map((v: string) => ({
-            value: v,
-            label: v,
-          })),
-        )
-      } catch {
-        setOptions([])
-      }
-    }
-
     fetchMethods()
-  }, [address]) // TODO: Consider using react query and storing these values in a useContext.
+  }, [address])
 
   const handleAddProtoFile = async () => {
     const result = (await Dialogs.OpenFile({
@@ -107,7 +111,7 @@ export default function SelectMethod() {
               label: v,
             })),
           })
-        } catch {}
+        } catch { }
       }
     }
 
@@ -121,7 +125,6 @@ export default function SelectMethod() {
         <Button
           id="input-method"
           variant="outline"
-          // biome-ignore lint/a11y/useSemanticElements: button opens a popup
           role="combobox"
           aria-expanded={open}
           className="w-full justify-between bg-background px-3 font-normal outline-offset-0 hover:bg-background focus-visible:border-ring focus-visible:outline-[3px] focus-visible:outline-ring/20"
@@ -140,16 +143,41 @@ export default function SelectMethod() {
           />
         </Button>
       </PopoverTrigger>
+
       <PopoverContent
         className="w-full min-w-[var(--radix-popper-anchor-width)] border-input p-0"
         align="start"
       >
         <Command>
-          <CommandInput placeholder="Search methods..." />
+          {/* ✅ 搜索框 + 刷新按钮 */}
+          <div className="flex items-center px-2 py-1.5">
+            <CommandInput
+              placeholder="Search methods..."
+              className="flex-1"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Refresh methods"
+              onClick={fetchMethods}
+              disabled={loading}
+              className="ml-1 shrink-0"
+            >
+              <RefreshCcw
+                size={18}
+                className={cn(
+                  'text-muted-foreground transition-colors',
+                  loading && 'animate-spin text-foreground'
+                )}
+              />
+            </Button>
+          </div>
+
           <CommandList>
             <CommandEmpty>No methods found.</CommandEmpty>
+
+            {/* Reflection methods */}
             <CommandGroup heading="Reflection">
-              {/* TODO: Show error on hover of heading, instead of as an option. */}
               {options.map((options) => (
                 <CommandItem
                   key={`Reflection${options.value}`}
@@ -169,61 +197,59 @@ export default function SelectMethod() {
                 </CommandItem>
               ))}
             </CommandGroup>
-            {protoFiles.map((protoFile) => {
-              return (
-                <Fragment key={protoFile}>
-                  <CommandSeparator />
-                  <CommandGroup>
-                    {/* Custom Heading */}
-                    <div
-                      cmdk-group-heading="true"
-                      className="flex items-center justify-between"
+
+            {/* Proto files methods */}
+            {protoFiles.map((protoFile) => (
+              <Fragment key={protoFile}>
+                <CommandSeparator />
+                <CommandGroup>
+                  <div
+                    cmdk-group-heading="true"
+                    className="flex items-center justify-between"
+                  >
+                    {protoFile.substring(protoFile.lastIndexOf('/') + 1)}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Delete"
+                      onClick={() => handleDeleteProtoFile(protoFile)}
+                      className="h-[20px] w-5 p-0"
                     >
-                      {protoFile.substring(protoFile.lastIndexOf('/') + 1)}
-                      <Button
-                        variant="ghost"
-                        // className mostly copied from the classes on the plus button for New Request.
-                        className="h-[20px] aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0 after:absolute after:-inset-2 after:md:hidden group-data-[collapsible=icon]:hidden"
-                        size="icon"
-                        aria-label="Delete"
-                        aria-hidden="true"
-                        onClick={() => handleDeleteProtoFile(protoFile)}
+                      <Trash2 />
+                    </Button>
+                  </div>
+                  {protoFileOptions[protoFile] ? (
+                    protoFileOptions[protoFile].map((options) => (
+                      <CommandItem
+                        key={protoFile + options.value}
+                        value={options.value}
+                        onSelect={(currentValue) => {
+                          updateActiveRequest({
+                            method:
+                              currentValue === method ? '' : currentValue,
+                            methodSource:
+                              currentValue === method ? '' : protoFile,
+                          })
+                          setOpen(false)
+                        }}
                       >
-                        <Trash2 />
-                      </Button>
-                    </div>
-                    {protoFileOptions[protoFile] ? (
-                      protoFileOptions[protoFile].map((options) => (
-                        <CommandItem
-                          key={protoFile + options.value}
-                          value={options.value}
-                          onSelect={(currentValue) => {
-                            updateActiveRequest({
-                              method:
-                                currentValue === method ? '' : currentValue,
-                              methodSource:
-                                currentValue === method ? '' : protoFile,
-                            })
-                            setOpen(false)
-                          }}
-                        >
-                          {options.label}
-                          {method === options.value && (
-                            <Check
-                              size={16}
-                              strokeWidth={2}
-                              className="ml-auto"
-                            />
-                          )}
-                        </CommandItem>
-                      ))
-                    ) : (
-                      <CommandEmpty>No methods found.</CommandEmpty>
-                    )}
-                  </CommandGroup>
-                </Fragment>
-              )
-            })}
+                        {options.label}
+                        {method === options.value && (
+                          <Check
+                            size={16}
+                            strokeWidth={2}
+                            className="ml-auto"
+                          />
+                        )}
+                      </CommandItem>
+                    ))
+                  ) : (
+                    <CommandEmpty>No methods found.</CommandEmpty>
+                  )}
+                </CommandGroup>
+              </Fragment>
+            ))}
+
             <CommandSeparator />
             <CommandGroup>
               <Button
@@ -235,7 +261,6 @@ export default function SelectMethod() {
                   size={16}
                   strokeWidth={2}
                   className="-ms-2 me-2 opacity-60"
-                  aria-hidden="true"
                 />
                 Import from a .proto file
               </Button>
