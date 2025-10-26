@@ -122,10 +122,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Install NSIS
-    if: runner.os == 'Windows'
-    run: choco install nsis -y
-    shell: powershell
     # Setup and configure GoLang
     - name: Setup GoLang
       uses: actions/setup-go@v4
@@ -170,6 +166,10 @@ runs:
       working-directory: ${{ inputs.app-working-directory }}
       run: ARCH=amd64 wails3 package
       shell: bash
+    - name: Install NSIS
+      if: inputs.build-platform == 'windows/amd64'
+      run: choco install nsis -y
+      shell: powershell
     - name: Build Windows App
       if: inputs.build == 'true' && inputs.build-platform == 'windows/amd64' && inputs.nsis == 'false'
       working-directory: ${{ inputs.app-working-directory }}
@@ -190,6 +190,10 @@ runs:
       working-directory: ${{ inputs.app-working-directory }}
       run: ARCH=arm64 wails3 package
       shell: bash
+    - name: Install NSIS
+      if: inputs.build-platform == 'windows/arm64'
+      run: choco install nsis -y
+      shell: powershell
     - name: Build Windows App
       if: inputs.build == 'true' && inputs.build-platform == 'windows/arm64' && inputs.nsis == 'false'
       working-directory: ${{ inputs.app-working-directory }}
