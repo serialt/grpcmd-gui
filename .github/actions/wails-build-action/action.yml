@@ -122,6 +122,10 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Install NSIS
+    if: runner.os == 'Windows'
+    run: choco install nsis -y
+    shell: powershell
     # Setup and configure GoLang
     - name: Setup GoLang
       uses: actions/setup-go@v4
