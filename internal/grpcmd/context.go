@@ -319,7 +319,7 @@ func (ctx *GrpcmdContext) CallWithResult(method, data string, headers []string) 
 	}
 	options := grpcurl.FormatOptions{
 		EmitJSONDefaultFields: true,
-		AllowUnknownFields:    false,
+		AllowUnknownFields:    true, // 允许未知字段
 		IncludeTextSeparator:  false,
 	}
 	rp, formatter, err := grpcurl.RequestParserAndFormatter(grpcurl.FormatJSON, ctx._dscSource, strings.NewReader(data), options)
