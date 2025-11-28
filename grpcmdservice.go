@@ -15,6 +15,12 @@ import (
 type GrpcmdService struct{}
 
 func (g *GrpcmdService) CallWithResult(address string, method string, metadata string, req string, protoPaths []string, protoFiles []string) grpcmd.Result {
+	// metadata需要为ASCII字符，增加校验（
+	if !isValidASCII(metadata) {
+		return grpcmd.Result{
+			Messages: []string{"Metadata contains non-ASCII characters."},
+		}
+	}
 	fmt.Printf("metadata: %v\n", metadata)
 	fmt.Printf("req: %v\n", req)
 	_, data, _ := parseHeadersAndBodyFromFullRequest(req)
@@ -163,4 +169,14 @@ func parseMetadata(header string) (metadata []string) {
 		metadata = append(metadata, fmt.Sprintf("%s:%v", k, v))
 	}
 	return
+}
+
+// isValidASCII 检查字符串是否只包含可打印的 ASCII 字符（0x20 ~ 0x7E）
+func isValidASCII(s string) bool {
+	for _, r := range s {
+		if r < 0x20 || r > 0x7E {
+			return false
+		}
+	}
+	return true
 }
