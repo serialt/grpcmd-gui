@@ -42,3 +42,7 @@ You need to have `Go`, `NPM`, and `Task` installed and available on your machine
 ## Thanks for
 * [grpcmd-gui](https://github.com/grpcmd/grpcmd-gui)
 * [grpcurl](https://github.com/fullstorydev/grpcurl)
+
+```
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.35
+```

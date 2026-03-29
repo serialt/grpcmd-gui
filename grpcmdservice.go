@@ -25,8 +25,8 @@ func (g *GrpcmdService) CallWithResult(address string, method string, metadata s
 	fmt.Printf("req: %v\n", req)
 	_, data, _ := parseHeadersAndBodyFromFullRequest(req)
 
-	_, header, _ := parseHeadersAndBodyFromFullRequest(metadata)
-	headers := parseMetadata(header)
+	_, metadataBody, _ := parseHeadersAndBodyFromFullRequest(metadata)
+	headers := parseMetadata(metadataBody)
 
 	ctx := grpcmd.NewContext()
 	defer ctx.Free()
@@ -159,6 +159,9 @@ func parseHeadersAndBodyFromFullRequest(req string) ([]string, string, error) {
 
 func parseMetadata(header string) (metadata []string) {
 	reqTrimmed := strings.TrimSpace(header)
+	if reqTrimmed == "" {
+		return
+	}
 	// 解析 JSON 到 map
 	var m map[string]interface{}
 	if err := json.Unmarshal([]byte(reqTrimmed), &m); err != nil {
