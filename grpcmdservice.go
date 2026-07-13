@@ -23,22 +23,31 @@ func (g *GrpcmdService) CallWithResult(address string, method string, metadata s
 	}
 	fmt.Printf("metadata: %v\n", metadata)
 	fmt.Printf("req: %v\n", req)
-	_, data, _ := parseHeadersAndBodyFromFullRequest(req)
+	_, data, err := parseHeadersAndBodyFromFullRequest(req)
+	if err != nil {
+		return grpcmd.Result{
+			Messages: []string{err.Error()},
+		}
+	}
 
-	_, metadataBody, _ := parseHeadersAndBodyFromFullRequest(metadata)
-	headers := parseMetadata(metadataBody)
+	headers, err := parseMetadata(metadata)
+	if err != nil {
+		return grpcmd.Result{
+			Messages: []string{err.Error()},
+		}
+	}
 
 	ctx := grpcmd.NewContext()
 	defer ctx.Free()
 	if len(protoFiles) > 0 {
-		err := ctx.SetFileSource(protoFiles, getExtendedProtoPaths(protoPaths, protoFiles))
+		err = ctx.SetFileSource(protoFiles, getExtendedProtoPaths(protoPaths, protoFiles))
 		if err != nil {
 			return grpcmd.Result{
 				Messages: []string{err.Error()},
 			}
 		}
 	}
-	err := ctx.Connect(address)
+	err = ctx.Connect(address)
 	if err != nil {
 		return grpcmd.Result{
 			Messages: []string{err.Error()},
@@ -96,6 +105,9 @@ func parseHeadersAndBodyFromFullRequest(req string) ([]string, string, error) {
 		return nil, "", nil
 	}
 	startOfFirstMessage := strings.Index(req, "{")
+	if startOfFirstMessage == -1 {
+		return nil, "", fmt.Errorf("request body must contain a JSON object")
+	}
 	if len(strings.TrimSpace(req[0:startOfFirstMessage])) == 0 {
 		// If there is only whitespace before the start of the first message, there are no headers.
 		return nil, req, nil
@@ -157,27 +169,31 @@ func parseHeadersAndBodyFromFullRequest(req string) ([]string, string, error) {
 // 	return headers, strings.Join(bodyLines, "\n"), nil
 // }
 
-func parseMetadata(header string) (metadata []string) {
-	reqTrimmed := strings.TrimSpace(header)
-	if reqTrimmed == "" {
-		return
-	}
-	// 解析 JSON 到 map
-	var m map[string]interface{}
-	if err := json.Unmarshal([]byte(reqTrimmed), &m); err != nil {
-		panic(err)
+func parseMetadata(header string) ([]string, error) {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return nil, nil
 	}
 
-	for k, v := range m {
+	var values map[string]interface{}
+	if err := json.Unmarshal([]byte(header), &values); err != nil {
+		return nil, fmt.Errorf("error while parsing metadata JSON:\n\t%w", err)
+	}
+
+	metadata := make([]string, 0, len(values))
+	for k, v := range values {
 		metadata = append(metadata, fmt.Sprintf("%s:%v", k, v))
 	}
-	return
+	return metadata, nil
 }
 
-// isValidASCII 检查字符串是否只包含可打印的 ASCII 字符（0x20 ~ 0x7E）
+// isValidASCII checks whether a string contains printable ASCII plus common JSON whitespace.
 func isValidASCII(s string) bool {
 	for _, r := range s {
-		if r < 0x20 || r > 0x7E {
+		if r == '\n' || r == '\r' || r == '\t' {
+			continue
+		}
+		if r < 0x20 || r > 0x7e {
 			return false
 		}
 	}
